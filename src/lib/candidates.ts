@@ -186,9 +186,17 @@ function matchesFileType(fileName: string, fileType: string): boolean {
   return extensions.some((ext) => lower.endsWith(ext));
 }
 
-/** The newest file in ~/Downloads matching a file type. Deterministic — no AI needed here. */
-export async function findNewestDownload(
+const RANK_TO_INDEX: Record<string, number> = {
+  newest: 0,
+  second_newest: 1,
+  third_newest: 2,
+  oldest: -1,
+};
+
+/** A file in ~/Downloads matching a file type, picked by recency rank. Deterministic — no AI needed here. */
+export async function findDownload(
   fileType: string,
+  rank: string,
 ): Promise<FileCandidate | null> {
   const downloadFiles = await listFilesIn("Downloads");
   const matching = downloadFiles.filter((f) =>
@@ -196,7 +204,8 @@ export async function findNewestDownload(
   );
   if (matching.length === 0) return null;
   matching.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return matching[0];
+  const index = RANK_TO_INDEX[rank] ?? 0;
+  return matching[index < 0 ? matching.length - 1 : index] ?? null;
 }
 
 /** Curated shortcuts for sites whose canonical URL isn't just "<name>.com". */
