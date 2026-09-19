@@ -1,34 +1,30 @@
 # Jev for Raycast
 
-Type a plain-English request into Raycast's root search and have
+Type anything into Raycast's root search, press **Tab**, and
 [Jev](https://docs.typesafe.ai/introduction) (TypeSafe's System One model)
-turn it into a concrete action: opening your most recent download, launching
-an app, finding a file, or opening a site.
+turns the request into a concrete action: opening your most recent download,
+launching an app, finding a file, or opening a site.
 
 ```
-⌥Space → "open the pdf i last downloaded" → Enter
+⌥Space → "open the pdf i last downloaded" → Tab → Enter
 ```
-
-(That's one Option+Space, since it's bound directly to the command — see
-Setup step 4 — then one Enter to confirm the preview.)
 
 ## How it works
 
-`Ask Jev` is a normal Raycast command. You reach it one of two ways:
+`Ask Jev` is a Raycast **fallback command**. Once you've added it in
+Raycast's settings (Setup step 4), this is the flow:
 
-- **Direct hotkey (recommended)** — bind a global hotkey straight to the
-  command (Setup step 4). Pressing it opens Jev's search box immediately;
-  there's nothing to pick from a list first.
-- **Fallback command** — Raycast also lets any eligible command opt into the
-  root-search fallback list (shown when a normal search has no results), but
-  that's a one-time opt-in *you* grant per command in Raycast's own Settings
-  — an extension can't silently register itself there, by design, so it
-  doesn't save you a step over the direct hotkey above. Both are covered in
-  Setup below; pick whichever fits how you want to invoke it.
+1. Open Raycast root search (your normal ⌥Space or whatever you use).
+2. Type whatever you want — no command selection needed first.
+3. When nothing else matches, `Ask Jev` sits at the bottom of the list with
+   a Tab hint. **Press Tab** and your typed text is handed to Jev as
+   `LaunchProps.fallbackText`.
+
+If you'd rather open Jev's search box directly, you can also bind a separate
+global hotkey to the command (Setup step 4).
 
 Either way, once you're in the command, it receives your query as
-`searchText` (seeded from `LaunchProps.fallbackText` when launched via the
-fallback route). From there:
+`searchText`. From there:
 
 1. Jev classifies the request (`open_download` / `open_app` / `open_file` /
    `open_url` / `unsupported`) and, in the same request, speculatively
@@ -74,22 +70,22 @@ for how an answer becomes an action.
    preference — paste your key there. (You can also set/change it later via
    Raycast → `Ask Jev` → `⌘,`.)
 
-4. Bind Option+Space directly to the command (one-time, in Raycast Settings
-   → **Extensions** → **Jev** → `Ask Jev`): click its hotkey field in the
-   list and press Option+Space. This is the step that makes it "just work" —
-   after this, Option+Space always opens straight into Jev's search box, no
-   root search or fallback list involved. (If Option+Space is already your
-   general Raycast hotkey, pick a different combo here, e.g. `⌥J`, so the two
-   don't collide.)
+4. Make Jev your Tab target in root search: Raycast Settings → **Advanced**
+   → **Fallback Commands** → add `Ask Jev` (and drag it to the top if you
+   have other fallbacks — Tab activates the first one). This is a one-time,
+   user-granted opt-in Raycast requires for any extension's fallback
+   command — an extension can't enable it for itself, by design.
 
-   — *or*, if you'd rather it show up as a suggestion in ordinary root
-   search instead of its own hotkey: Raycast Settings → **Advanced** →
-   **Fallback Commands** → add `Ask Jev`. This is the same kind of one-time,
-   user-granted opt-in Raycast requires for any extension's fallback command
-   — there's no way for the extension to enable this for itself.
+   After this, ⌥Space → type anything → **Tab** sends the query straight to
+   Jev.
 
-5. Try it: press your hotkey from step 4, type something like `open the pdf
-   i last downloaded`, and press Enter on the preview to run it.
+   — *or*, if you'd rather have a dedicated global hotkey that opens Jev's
+   search box immediately: Raycast Settings → **Extensions** → **Jev** →
+   `Ask Jev` → click its hotkey field and press your combo (e.g. `⌥J`, so
+   it doesn't collide with Raycast's own Option+Space).
+
+5. Try it: open root search, type `open the pdf i last downloaded`, press
+   Tab, then Enter on the preview to run it.
 
 ## Design notes from debugging real queries
 
@@ -127,10 +123,10 @@ inputs:
 ## Note on `npm run lint`
 
 `ray lint` checks `package.json`'s `author` field against a registered
-Raycast Store username (it's currently a placeholder, `"nazeeh"`). This only
-matters if you plan to `ray publish` — running the extension locally via
-`npm run dev` doesn't need it. If you do want to publish, change `author` in
-`package.json` to your real Raycast account username first.
+Raycast Store username (currently `"naz3eh"`). This only matters if you plan
+to `ray publish` — running the extension locally via `npm run dev` doesn't
+need it. If the Raycast account username is different, change `author` in
+`package.json` before publishing.
 
 ## Extending it
 

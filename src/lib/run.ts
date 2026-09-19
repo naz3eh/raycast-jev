@@ -10,7 +10,7 @@ import {
 import path from "path";
 import {
   extractDomainFromText,
-  findNewestDownload,
+  findDownload,
   guessDomainFromText,
   SITE_TABLE,
   type FileCandidate,
@@ -64,15 +64,21 @@ export async function resolveAction(
 ): Promise<ResolvedAction | UnresolvedAction> {
   switch (result.action) {
     case "open_download": {
-      const file = await findNewestDownload(result.fileType);
+      const file = await findDownload(result.fileType, result.downloadRank);
       if (!file) {
         const kind = result.fileType === "any" ? "" : `${result.fileType} `;
         return { reason: `No matching ${kind}download found in ~/Downloads.` };
       }
       const name = path.basename(file.absolutePath);
+      const rankLabel =
+        result.downloadRank === "oldest"
+          ? "Oldest matching download"
+          : result.downloadRank === "newest"
+            ? "Most recent matching download"
+            : `${result.downloadRank.replace("_", " ")} matching download`;
       return {
         title: `Open ${name}`,
-        subtitle: "Most recent matching download",
+        subtitle: rankLabel,
         icon: Icon.Download,
         run: () => openAndConfirm(file.absolutePath, name),
       };

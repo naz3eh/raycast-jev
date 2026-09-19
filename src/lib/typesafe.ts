@@ -18,6 +18,8 @@ function getClient(): TypeSafeClient {
 export type ActionKind =
   "open_download" | "open_app" | "open_file" | "open_url" | "unsupported";
 export type FileType = "pdf" | "image" | "document" | "archive" | "any";
+export type DownloadRank =
+  "newest" | "second_newest" | "third_newest" | "oldest";
 
 export const NONE = "none";
 export const OTHER = "other";
@@ -26,6 +28,7 @@ export interface InterpretResult {
   action: ActionKind;
   actionConfidence: number;
   fileType: FileType;
+  downloadRank: DownloadRank; // which matching download: latest, nth-latest, or first-ever
   appName: string; // an installed app's name, or NONE
   fileCandidate: string; // a candidate's label, or NONE
   siteName: string; // a SITE_TABLE key, or OTHER
@@ -84,7 +87,7 @@ export async function interpret(
           "still probably open_url (most brands are best known as websites) rather than unsupported.",
         {
           open_download:
-            "Open the most recently downloaded file, optionally of a specific type (pdf, image, document, archive).",
+            "Open a downloaded file, optionally of a specific type (pdf, image, document, archive) — whether the latest or an earlier one.",
           open_app:
             "Launch or switch to an application listed in `installedApps`.",
           open_file:
@@ -106,6 +109,20 @@ export async function interpret(
           any: "No specific type mentioned, or not applicable",
         },
       ),
+      downloadRank: choice(
+        'If the request is about opening a download, which one? "newest" is the most recent ' +
+          'matching download; "oldest" is the very first one they ever downloaded (words like ' +
+          '"first", "oldest", "earliest", "original"); the nth options cover "second most ' +
+          'recent"/"third most recent" phrasing. Default to newest when the request doesn\'t say.',
+        {
+          newest:
+            'The most recently downloaded matching file ("last", "latest", "recent", or unspecified).',
+          second_newest: "The second most recently downloaded matching file.",
+          third_newest: "The third most recently downloaded matching file.",
+          oldest:
+            'The oldest/first-ever matching download ("first", "oldest", "earliest", "original").',
+        },
+      ),
       appName: choice(
         "If the request is about launching or switching to an application, which entry in `installedApps` does it mean? Ignore if not applicable.",
         appCriteria,
@@ -125,6 +142,7 @@ export async function interpret(
     action: response.answers.action.choice as ActionKind,
     actionConfidence: response.answers.action.confidence,
     fileType: response.answers.fileType.choice as FileType,
+    downloadRank: response.answers.downloadRank.choice as DownloadRank,
     appName: response.answers.appName.choice,
     fileCandidate: response.answers.fileCandidate.choice,
     siteName: response.answers.siteName.choice,

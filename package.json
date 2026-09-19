@@ -4,7 +4,7 @@
   "title": "Jev",
   "description": "Type what you want in plain English and Jev figures out what to do — open a recent download, launch an app, find a file, or open a site.",
   "icon": "icon.png",
-  "author": "nazeeh",
+  "author": "naz3eh",
   "categories": [
     "Productivity",
     "System"
@@ -14,7 +14,7 @@
     {
       "name": "ask-jev",
       "title": "Ask Jev",
-      "subtitle": "Jev",
+      "subtitle": "Press ⇥ Tab to ask",
       "description": "Turn a plain-English request into a concrete action: open a recent download, launch an app, find a file, or open a site.",
       "mode": "view"
     }
