@@ -3,6 +3,8 @@ import {
   ActionPanel,
   Icon,
   List,
+  showToast,
+  Toast,
   type LaunchProps,
 } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
@@ -18,7 +20,13 @@ import { interpret } from "./lib/typesafe";
 /** Wait for typing to settle before spending a request on it. */
 const DEBOUNCE_MS = 350;
 
-async function askJev(query: string) {
+interface AskResult {
+  /** The debounced query this result was computed for — stale results are never rendered. */
+  query: string;
+  action: Awaited<ReturnType<typeof resolveAction>>;
+}
+
+async function askJev(query: string): Promise<AskResult | null> {
   const trimmed = query.trim();
   if (!trimmed) return null;
 
@@ -34,7 +42,10 @@ async function askJev(query: string) {
     Object.keys(SITE_TABLE),
   );
 
-  return resolveAction(trimmed, interpretation, apps, fileCandidates);
+  return {
+    query,
+    action: await resolveAction(trimmed, interpretation, apps, fileCandidates),
+  };
 }
 
 export default function Command(props: LaunchProps) {
@@ -47,12 +58,31 @@ export default function Command(props: LaunchProps) {
   }, [searchText]);
 
   const trimmedDebounced = debouncedText.trim();
-  const { data, isLoading } = usePromise(askJev, [debouncedText], {
+  const { data, isLoading, error } = usePromise(askJev, [debouncedText], {
     execute: trimmedDebounced.length > 0,
   });
 
-  const resolved = data && isResolved(data) ? data : undefined;
-  const reason = data && !isResolved(data) ? data.reason : undefined;
+  useEffect(() => {
+    if (error) {
+      showToast({
+        style: Toast.Style.Failure,
+        title: "Jev couldn't answer",
+        message: String(error),
+      });
+    }
+  }, [error]);
+
+  // usePromise keeps the previous result while a new query loads; only render
+  // a result that was actually computed for the current debounced text.
+  const current = data && data.query === debouncedText ? data : null;
+  const thinking =
+    searchText.trim() !== trimmedDebounced ||
+    isLoading ||
+    (trimmedDebounced.length > 0 && !current && !error);
+  const resolved =
+    current && isResolved(current.action) ? current.action : null;
+  const reason =
+    current && !isResolved(current.action) ? current.action.reason : undefined;
 
   return (
     <List
@@ -81,9 +111,16 @@ export default function Command(props: LaunchProps) {
       ) : (
         <List.EmptyView
           icon={Icon.QuestionMark}
-          title={isLoading ? "Thinking…" : (reason ?? "Not sure what you mean")}
+          title={
+            thinking
+              ? "Thinking…"
+              : (reason ??
+                (error
+                  ? "Something went wrong asking Jev"
+                  : "Not sure what you mean"))
+          }
           description={
-            isLoading ? undefined : "Try rephrasing, or be more specific."
+            thinking ? undefined : "Try rephrasing, or be more specific."
           }
         />
       )}
