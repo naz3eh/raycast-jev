@@ -114,23 +114,26 @@ async function collectFiles(
   return files;
 }
 
-let filesCache: FileCandidate[] | null = null;
+let filesCache: { files: FileCandidate[]; at: number } | null = null;
+
+/** How long a scan stays fresh — short enough that a file downloaded seconds ago still resolves. */
+const FILES_CACHE_TTL_MS = 30_000;
 
 /**
- * The raw inventory of the watched folders, scanned once per session (like
- * appsCache) with a single shared MAX_FILES_SCANNED budget across all three
- * folders — previously each folder got its own 4,000-file counter and every
- * keystroke-pause triggered a full rescan.
+ * The raw inventory of the watched folders. Cached (with a TTL) so typing
+ * doesn't rescan the disk on every debounce pause, while each folder still
+ * gets its own MAX_FILES_SCANNED budget so a huge Downloads can't starve
+ * Desktop/Documents of candidates.
  */
 async function getAllFiles(): Promise<FileCandidate[]> {
-  if (filesCache) return filesCache;
-  const scanned = { count: 0 };
+  if (filesCache && Date.now() - filesCache.at < FILES_CACHE_TTL_MS)
+    return filesCache.files;
   const all: FileCandidate[] = [];
   for (const folder of FOLDERS_TO_SCAN) {
     const dir = path.join(os.homedir(), folder);
-    all.push(...(await collectFiles(dir, folder, SCAN_DEPTH, scanned)));
+    all.push(...(await collectFiles(dir, folder, SCAN_DEPTH, { count: 0 })));
   }
-  filesCache = all;
+  filesCache = { files: all, at: Date.now() };
   return all;
 }
 
