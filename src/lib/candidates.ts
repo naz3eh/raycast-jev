@@ -106,9 +106,7 @@ async function collectFiles(
         // File may have been removed/renamed between readdir and stat; skip it.
       }
     } else if (entry.isDirectory() && depth > 0) {
-      files.push(
-        ...(await collectFiles(absolutePath, entryLabel, depth - 1)),
-      );
+      files.push(...(await collectFiles(absolutePath, entryLabel, depth - 1)));
     }
   }
   return files;
