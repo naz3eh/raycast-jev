@@ -1,6 +1,7 @@
 import {
   Action,
   ActionPanel,
+  getPreferenceValues,
   Icon,
   List,
   showToast,
@@ -30,10 +31,27 @@ async function askJev(query: string): Promise<AskResult | null> {
   const trimmed = query.trim();
   if (!trimmed) return null;
 
+  const { shareInstalledApps } = getPreferenceValues<Preferences>();
+
   const apps = rankAppsByQuery(await listInstalledApps(), trimmed);
-  const appNames = apps.map((app) => app.name).slice(0, 250);
+  // App names only leave the device when the user opted in — and then only
+  // for classification and the app-picking follow-up, never for file/site
+  // queries that don't need them.
+  const appNames = shareInstalledApps
+    ? apps.map((app) => app.name).slice(0, 250)
+    : [];
 
   const action = await classifyAction(trimmed, appNames);
+
+  if (action === "open_app" && !shareInstalledApps) {
+    return {
+      query,
+      action: {
+        reason:
+          'App matching needs the "Share installed apps with Jev" preference — enable it in the command\'s settings (⌘,).',
+      },
+    };
+  }
 
   // Only gather (and send to the API) the candidates this action needs.
   const fileCandidates =

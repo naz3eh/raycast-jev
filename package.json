@@ -26,6 +26,14 @@
       "description": "Your TypeSafe API key from https://docs.typesafe.ai — kept on-device, sent only to api.typesafe.ai.",
       "type": "password",
       "required": true
+    },
+    {
+      "name": "shareInstalledApps",
+      "label": "Share installed app names with Jev",
+      "description": "Sends your installed app names to api.typesafe.ai so requests like \"open cursor\" match the right app. Turn off to keep every local name on-device — file names are already sent only when a request is about opening a file.",
+      "type": "checkbox",
+      "required": false,
+      "default": true
     }
   ],
   "dependencies": {
