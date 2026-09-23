@@ -103,7 +103,9 @@ async function statEntries(
  * one level of subfolders), STAT_CONCURRENCY at a time so a huge folder
  * can't serialize into unbounded latency. `fileNameFilter` runs on the name
  * alone (free) before any stat — `findDownload` uses it to only stat files
- * that can actually match the requested type.
+ * that can actually match the requested type. No scan cap: an arbitrarily
+ * truncated inventory could hide the true newest/oldest file and
+ * `findDownload` would present a partial result as authoritative.
  */
 async function collectFiles(
   absoluteDir: string,
