@@ -74,16 +74,42 @@ export function rankAppsByQuery(
     .map((entry) => entry.app);
 }
 
+/** fs.stat calls per batch — parallel enough to bound scan latency without truncating coverage. */
+const STAT_CONCURRENCY = 32;
+
+async function statEntries(
+  entries: { label: string; absolutePath: string }[],
+): Promise<FileCandidate[]> {
+  const files: FileCandidate[] = [];
+  for (let i = 0; i < entries.length; i += STAT_CONCURRENCY) {
+    const batch = await Promise.all(
+      entries.slice(i, i + STAT_CONCURRENCY).map(async (entry) => {
+        try {
+          const stat = await fs.stat(entry.absolutePath);
+          return { ...entry, mtimeMs: stat.mtimeMs };
+        } catch {
+          // File may have been removed/renamed between readdir and stat; skip it.
+          return null;
+        }
+      }),
+    );
+    for (const file of batch) if (file) files.push(file);
+  }
+  return files;
+}
+
 /**
  * Stats every file in the watched folders (they're shallow — home dirs plus
- * one level of subfolders). No scan cap: an arbitrarily truncated inventory
- * could hide the true newest/oldest file and `findDownload` would present a
- * partial result as authoritative.
+ * one level of subfolders), STAT_CONCURRENCY at a time so a huge folder
+ * can't serialize into unbounded latency. `fileNameFilter` runs on the name
+ * alone (free) before any stat — `findDownload` uses it to only stat files
+ * that can actually match the requested type.
  */
 async function collectFiles(
   absoluteDir: string,
   label: string,
   depth: number,
+  fileNameFilter?: (fileName: string) => boolean,
 ): Promise<FileCandidate[]> {
   let entries;
   try {
@@ -92,22 +118,31 @@ async function collectFiles(
     return [];
   }
 
-  const files: FileCandidate[] = [];
+  const fileEntries: { label: string; absolutePath: string }[] = [];
+  const subdirs: { absoluteDir: string; label: string }[] = [];
   for (const entry of entries) {
     if (entry.name.startsWith(".")) continue;
     const absolutePath = path.join(absoluteDir, entry.name);
     const entryLabel = `${label}/${entry.name}`;
 
     if (entry.isFile()) {
-      try {
-        const stat = await fs.stat(absolutePath);
-        files.push({ label: entryLabel, absolutePath, mtimeMs: stat.mtimeMs });
-      } catch {
-        // File may have been removed/renamed between readdir and stat; skip it.
-      }
+      if (fileNameFilter && !fileNameFilter(entry.name)) continue;
+      fileEntries.push({ label: entryLabel, absolutePath });
     } else if (entry.isDirectory() && depth > 0) {
-      files.push(...(await collectFiles(absolutePath, entryLabel, depth - 1)));
+      subdirs.push({ absoluteDir: absolutePath, label: entryLabel });
     }
+  }
+
+  const files = await statEntries(fileEntries);
+  for (const subdir of subdirs) {
+    files.push(
+      ...(await collectFiles(
+        subdir.absoluteDir,
+        subdir.label,
+        depth - 1,
+        fileNameFilter,
+      )),
+    );
   }
   return files;
 }
@@ -230,18 +265,18 @@ const RANK_TO_INDEX: Record<string, number> = {
  * Deterministic — no AI needed here. Scans ~/Downloads fresh on every call
  * (one shallow folder, so it's cheap) — download queries are exactly where a
  * file that arrived seconds ago must resolve, so the TTL cache can't be used.
+ * Same subfolder depth as the shared inventory, and only files that can
+ * match the requested type get stat'd.
  */
 export async function findDownload(
   fileType: string,
   rank: string,
 ): Promise<FileCandidate | null> {
-  const downloadFiles = await collectFiles(
+  const matching = await collectFiles(
     path.join(os.homedir(), "Downloads"),
     "Downloads",
-    0,
-  );
-  const matching = downloadFiles.filter((f) =>
-    matchesFileType(path.basename(f.absolutePath), fileType),
+    SCAN_DEPTH,
+    (fileName) => matchesFileType(fileName, fileType),
   );
   if (matching.length === 0) return null;
   matching.sort((a, b) => b.mtimeMs - a.mtimeMs);
